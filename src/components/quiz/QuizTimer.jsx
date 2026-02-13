@@ -1,48 +1,42 @@
 // src/components/quiz/QuizTimer.jsx
 import React, { useEffect } from 'react';
 
-const formatMMSS = (totalSeconds) => {
-  const s = Math.max(0, Number(totalSeconds || 0));
-  const mm = String(Math.floor(s / 60)).padStart(2, '0');
-  const ss = String(s % 60).padStart(2, '0');
-  return `${mm}:${ss}`;
-};
-
-const QuizTimer = ({ timeRemaining, setTimeRemaining, onTimeUp }) => {
+const QuizTimer = ({ timeRemaining, setTimeRemaining, onTimeUp, className = '' }) => {
   useEffect(() => {
-    if (timeRemaining === null || timeRemaining === undefined) return;
-
-    if (timeRemaining <= 0) {
-      if (typeof onTimeUp === 'function') onTimeUp();
+    if (timeRemaining === null || timeRemaining <= 0) {
+      if (timeRemaining === 0) {
+        onTimeUp();
+      }
       return;
     }
 
-    const timerId = setInterval(() => {
-      setTimeRemaining((prev) => {
-        const next = (prev ?? 0) - 1;
-        if (next <= 0) {
-          clearInterval(timerId);
-          if (typeof onTimeUp === 'function') onTimeUp();
+    const timer = setInterval(() => {
+      setTimeRemaining(prev => {
+        if (prev <= 1) {
+          clearInterval(timer);
           return 0;
         }
-        return next;
+        return prev - 1;
       });
     }, 1000);
 
-    return () => clearInterval(timerId);
+    return () => clearInterval(timer);
   }, [timeRemaining, setTimeRemaining, onTimeUp]);
 
-  // ✅ PERBAIKAN: Return JSX element dengan styling yang sangat visible
+  if (timeRemaining === null) return null;
+
+  const minutes = Math.floor(timeRemaining / 60);
+  const seconds = timeRemaining % 60;
+  const isLowTime = timeRemaining < 60;
+
   return (
-    <div className="flex items-center justify-center min-w-[70px]">
-      <span 
-        className="font-mono font-bold text-2xl tracking-wider text-white"
-        style={{ 
-          textShadow: '0 2px 4px rgba(0,0,0,0.3), 0 0 8px rgba(255,255,255,0.5)',
-          letterSpacing: '0.1em'
-        }}
-      >
-        {formatMMSS(timeRemaining)}
+    <div className={`flex items-center gap-2 font-semibold ${isLowTime ? 'animate-pulse' : ''} ${className}`}>
+      <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
+        <polyline points="12 6 12 12 16 14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+      </svg>
+      <span className="font-mono tabular-nums">
+        {String(minutes).padStart(2, '0')}:{String(seconds).padStart(2, '0')}
       </span>
     </div>
   );

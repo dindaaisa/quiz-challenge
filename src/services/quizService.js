@@ -15,7 +15,7 @@ const decodeHTML = (html) => {
 const quizService = {
   getQuestions: async (amount = 10, category = '', difficulty = '') => {
     if (USE_MOCK_DATA) {
-      console.log('📦 Using mock data for development...');
+      console.log('ðŸ“¦ Using mock data for development...');
       await new Promise((resolve) => setTimeout(resolve, 500));
 
       // penting: pastikan mockQuestions juga punya correct_answer
@@ -101,7 +101,7 @@ const quizService = {
           difficulty: q.difficulty,
           type: q.type,
 
-          // ✅ INI KUNCI BIAR RESULT PAGE BISA NAMPILIN JAWABAN BENAR
+          // âœ… INI KUNCI BIAR RESULT PAGE BISA NAMPILIN JAWABAN BENAR
           correct_answer: correctText,
           incorrect_answers: incorrectTexts,
 
@@ -109,30 +109,11 @@ const quizService = {
         };
       });
 
-      // ✅ PERBAIKAN: Ambil kategori yang paling umum dari semua soal
-      const categoryCount = {};
-      questions.forEach(q => {
-        const cat = q.category || 'General Knowledge';
-        categoryCount[cat] = (categoryCount[cat] || 0) + 1;
-      });
-      
-      // Cari kategori dengan jumlah terbanyak
-      const dominantCategory = Object.keys(categoryCount).reduce((a, b) => 
-        categoryCount[a] > categoryCount[b] ? a : b, 
-        'General Knowledge'
-      );
-
-      // Jika semua soal punya kategori yang sama, gunakan itu. Jika tidak, gunakan "Mixed Categories"
-      const finalCategory = questions.length > 0 && 
-        Object.keys(categoryCount).length === 1 
-        ? questions[0].category 
-        : (Object.keys(categoryCount).length > 3 ? 'Mixed Categories' : dominantCategory);
-
       return {
         success: true,
         data: questions,
         total: questions.length,
-        category: finalCategory,
+        category: questions[0]?.category || 'General',
         difficulty: questions[0]?.difficulty || 'medium',
       };
     } catch (error) {

@@ -1,5 +1,5 @@
 // src/pages/QuizPage.jsx
-import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuizProgress } from '../hooks/useQuizProgress';
 import authService from '../services/authService';
@@ -15,8 +15,9 @@ const QuizPage = () => {
 
   const [questions, setQuestions] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  // ✅ meta supaya kategori dan total konsisten dengan intro
   const [quizMeta, setQuizMeta] = useState(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const storageKey = `${username}:quiz-progress`;
 
@@ -46,21 +47,14 @@ const QuizPage = () => {
       return;
     }
 
-    try {
-      const savedQuestions = JSON.parse(savedQuestionsStr);
-      setQuestions(Array.isArray(savedQuestions) ? savedQuestions : []);
-    } catch (e) {
-      console.error('Error parsing questions:', e);
-      navigate('/intro');
-      return;
-    }
+    const savedQuestions = JSON.parse(savedQuestionsStr);
+    setQuestions(Array.isArray(savedQuestions) ? savedQuestions : []);
 
+    // ✅ ambil meta
     const metaStr = localStorage.getItem(`${username}:quiz-meta`);
     if (metaStr) {
       try {
-        const parsed = JSON.parse(metaStr);
-        setQuizMeta(parsed);
-        console.log('Quiz Meta loaded:', parsed);
+        setQuizMeta(JSON.parse(metaStr));
       } catch {
         setQuizMeta(null);
       }
@@ -68,6 +62,7 @@ const QuizPage = () => {
 
     const savedProgress = localStorage.getItem(storageKey);
     if (!savedProgress) {
+      // ✅ kalau meta ada, pakai totalTime dari meta biar sama kayak intro
       const totalTime = metaStr ? (JSON.parse(metaStr)?.totalTime ?? 300) : 300;
       initializeQuiz(totalTime);
     }
@@ -84,109 +79,98 @@ const QuizPage = () => {
   const isLastQuestion = totalQuestions > 0 && currentQuestionIndex === totalQuestions - 1;
   const isFirstQuestion = currentQuestionIndex === 0;
 
-  const extractAnswerText = useCallback((ansObj) => {
+  const extractAnswerText = (ansObj) => {
     if (ansObj === null || ansObj === undefined) return '';
     if (typeof ansObj === 'string' || typeof ansObj === 'number') return String(ansObj);
     if (typeof ansObj === 'object') {
-      const txt = ansObj.text ?? ansObj.option ?? ansObj.answer ?? ansObj.selected ?? ansObj.label ?? ansObj.value ?? ansObj.name ?? '';
+      const txt = ansObj.option ?? ansObj.answer ?? ansObj.selected ?? ansObj.text ?? ansObj.label ?? ansObj.value ?? ansObj.name ?? '';
       return String(txt ?? '');
     }
     return '';
-  }, []);
+  };
 
-  const normalize = useCallback((s) => String(s ?? '').trim(), []);
+  const normalize = (s) => String(s ?? '').trim();
 
   const answeredCount = useMemo(() => {
     if (!answers) return 0;
     return Object.keys(answers).filter((k) => normalize(extractAnswerText(answers[k])) !== '').length;
-  }, [answers, normalize, extractAnswerText]);
+  }, [answers]);
 
   const progressPct = useMemo(() => {
     if (!totalQuestions) return 0;
     return Math.round((answeredCount / totalQuestions) * 100);
   }, [answeredCount, totalQuestions]);
 
-  const handleSelectAnswer = useCallback((answer) => {
+  const handleSelectAnswer = (answer) => {
     recordAnswer(currentQuestionIndex, answer);
-  }, [currentQuestionIndex, recordAnswer]);
+  };
 
-  const handleNext = useCallback(() => {
+  const handleNext = () => {
     nextQuestion(totalQuestions);
-  }, [nextQuestion, totalQuestions]);
+  };
 
-  const handlePrevious = useCallback(() => {
+  const handlePrevious = () => {
     previousQuestion();
-  }, [previousQuestion]);
+  };
 
-  const handleSubmit = useCallback(() => {
-    if (isSubmitting) return;
-
+  const handleSubmit = () => {
     const confirmSubmit = window.confirm(
       'Apakah kamu yakin ingin menyelesaikan quiz?\n\nJawaban yang belum diisi akan dianggap kosong.'
     );
     if (!confirmSubmit) return;
 
-    setIsSubmitting(true);
+    let correct = 0;
+    let wrong = 0;
+    let unanswered = 0;
 
-    try {
-      let correct = 0;
-      let wrong = 0;
-      let unanswered = 0;
+    const detailedAnswers = questions.map((q, index) => {
+      const ansObj = answers?.[index];
+      const userAnswerText = normalize(extractAnswerText(ansObj));
+      const correctAnswerText = normalize(q?.correct_answer);
 
-      const detailedAnswers = questions.map((q, index) => {
-        const ansObj = answers?.[index];
-        const userAnswerText = normalize(extractAnswerText(ansObj));
-        const correctAnswerText = normalize(q?.correct_answer);
+      const isAnswered = userAnswerText !== '';
+      let isCorrect = false;
 
-        const isAnswered = userAnswerText !== '';
-        let isCorrect = false;
+      if (ansObj && typeof ansObj === 'object' && typeof ansObj.correct === 'boolean') {
+        isCorrect = ansObj.correct;
+      } else {
+        isCorrect = isAnswered && userAnswerText === correctAnswerText;
+      }
 
-        if (ansObj && typeof ansObj === 'object' && typeof ansObj.correct === 'boolean') {
-          isCorrect = ansObj.correct;
-        } else {
-          isCorrect = isAnswered && userAnswerText === correctAnswerText;
-        }
+      if (!isAnswered) unanswered++;
+      else if (isCorrect) correct++;
+      else wrong++;
 
-        if (!isAnswered) unanswered++;
-        else if (isCorrect) correct++;
-        else wrong++;
-
-        return {
-          question: q,
-          userAnswer: isAnswered ? userAnswerText : null,
-          correctAnswer: q?.correct_answer ?? '',
-          isCorrect,
-          isAnswered,
-        };
-      });
-
-      const result = {
-        correct,
-        wrong,
-        unanswered,
-        total: questions.length,
-        score: Math.round((correct / questions.length) * 100),
-        timeUsed: (quizMeta?.totalTime ?? 300) - Math.max(0, timeRemaining || 0),
-        detailedAnswers,
+      return {
+        question: q,
+        userAnswer: isAnswered ? userAnswerText : null,
+        correctAnswer: q?.correct_answer ?? '',
+        isCorrect,
+        isAnswered,
       };
+    });
 
-      localStorage.setItem(`${username}:quiz-result`, JSON.stringify(result));
-      resetQuiz();
-      localStorage.removeItem(`${username}:quiz-questions`);
-      localStorage.removeItem(`${username}:quiz-meta`);
-      navigate('/result');
-    } catch (error) {
-      console.error('Error submitting quiz:', error);
-      alert('Terjadi kesalahan saat menyelesaikan quiz. Silakan coba lagi.');
-      setIsSubmitting(false);
-    }
-  }, [isSubmitting, questions, answers, normalize, extractAnswerText, quizMeta, timeRemaining, username, resetQuiz, navigate]);
+    const result = {
+      correct,
+      wrong,
+      unanswered,
+      total: questions.length,
+      score: Math.round((correct / questions.length) * 100),
+      timeUsed: (quizMeta?.totalTime ?? 300) - (timeRemaining || 0),
+      detailedAnswers,
+    };
 
-  const handleTimeUp = useCallback(() => {
-    if (isSubmitting) return;
+    localStorage.setItem(`${username}:quiz-result`, JSON.stringify(result));
+    resetQuiz();
+    localStorage.removeItem(`${username}:quiz-questions`);
+    localStorage.removeItem(`${username}:quiz-meta`);
+    navigate('/result');
+  };
+
+  const handleTimeUp = () => {
     alert('Waktu habis! Quiz akan diselesaikan otomatis.');
     handleSubmit();
-  }, [isSubmitting, handleSubmit]);
+  };
 
   if (isLoading) {
     return <Loading text="Memuat quiz..." />;
@@ -206,7 +190,8 @@ const QuizPage = () => {
     );
   }
 
-  const fixedCategoryLabel = quizMeta?.category || 'Mixed Categories';
+  // ✅ UBAH: Kategori jadi "Campur"
+  const fixedCategoryLabel = 'Campur';
 
   return (
     <PageBackground>
@@ -260,11 +245,11 @@ const QuizPage = () => {
             {/* RIGHT AREA */}
             <div className="space-y-4">
 
-              {/* HEADER CARD - ✅ TIMER DIPERBAIKI DENGAN KONTRAS SANGAT TINGGI */}
+              {/* HEADER CARD */}
               <div className="card overflow-hidden">
                 <div className="p-4 md:p-5 bg-primary">
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
                       <div className="text-white font-bold text-base md:text-lg leading-tight truncate">
                         Quiz Final Modul
                       </div>
@@ -273,24 +258,20 @@ const QuizPage = () => {
                       </div>
                     </div>
 
-                    {/* ✅ TIMER BOX - SUPER VISIBLE DENGAN BACKGROUND PUTIH */}
-                    {timeRemaining !== null && (
-                      <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                        <div className="text-white/90 text-xs font-medium">Sisa Waktu</div>
-                        <div 
-                          className="bg-white rounded-xl px-4 py-3 shadow-lg"
-                          style={{
-                            boxShadow: '0 4px 12px rgba(0,0,0,0.2), inset 0 1px 3px rgba(0,0,0,0.1)'
-                          }}
-                        >
+                    {/* ✅ UBAH: Timer Section */}
+                    <div className="flex items-center gap-3 flex-shrink-0">
+                      <div className="text-white/90 text-xs font-semibold">Sisa Waktu</div>
+                      {timeRemaining !== null && (
+                        <div className="bg-white/20 rounded-xl px-3 py-1.5 min-w-[90px] text-center">
                           <QuizTimer
                             timeRemaining={timeRemaining}
                             setTimeRemaining={setTimeRemaining}
                             onTimeUp={handleTimeUp}
+                            className="text-white font-bold text-lg"
                           />
                         </div>
-                      </div>
-                    )}
+                      )}
+                    </div>
                   </div>
 
                   <div className="mt-4">
@@ -300,10 +281,7 @@ const QuizPage = () => {
                     </div>
 
                     <div className="w-full h-2 rounded-full bg-white/20 overflow-hidden">
-                      <div 
-                        className="h-full bg-white transition-all duration-300 ease-out" 
-                        style={{ width: `${progressPct}%` }} 
-                      />
+                      <div className="h-full bg-white transition-all duration-300" style={{ width: `${progressPct}%` }} />
                     </div>
                   </div>
                 </div>
@@ -335,13 +313,8 @@ const QuizPage = () => {
                   <div className="flex-1" />
 
                   {isLastQuestion ? (
-                    <Button 
-                      onClick={handleSubmit} 
-                      variant="success" 
-                      className="w-full sm:w-auto"
-                      disabled={isSubmitting}
-                    >
-                      {isSubmitting ? 'Memproses...' : 'Selesai'}
+                    <Button onClick={handleSubmit} variant="success" className="w-full sm:w-auto">
+                      Selesai
                     </Button>
                   ) : (
                     <Button onClick={handleNext} variant="primary" className="w-full sm:w-auto">

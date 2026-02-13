@@ -25,23 +25,15 @@ const ResultPage = () => {
     }
 
     try {
-      const parsed = JSON.parse(savedResult);
-      // ✅ PERBAIKAN: Validasi struktur data result
-      if (!parsed || typeof parsed !== 'object') {
-        throw new Error('Invalid result data');
-      }
-      setResult(parsed);
+      setResult(JSON.parse(savedResult));
     } catch (e) {
       console.error('Invalid quiz result JSON:', e);
-      alert('Data hasil quiz tidak valid. Kembali ke halaman intro.');
       navigate('/intro');
     }
   }, [username, navigate]);
 
   const handleQuizAgain = () => {
-    // ✅ Bersihkan semua data quiz sebelumnya
     localStorage.removeItem(`${username}:quiz-result`);
-    localStorage.removeItem(`${username}:quiz-progress`);
     navigate('/intro');
   };
 
@@ -52,14 +44,12 @@ const ResultPage = () => {
 
   const minutes = useMemo(() => {
     if (!result) return 0;
-    const timeUsed = Number(result.timeUsed) || 0;
-    return Math.floor(timeUsed / 60);
+    return Math.floor((result.timeUsed || 0) / 60);
   }, [result]);
 
   const seconds = useMemo(() => {
     if (!result) return 0;
-    const timeUsed = Number(result.timeUsed) || 0;
-    return timeUsed % 60;
+    return (result.timeUsed || 0) % 60;
   }, [result]);
 
   const scorePct = useMemo(() => {
@@ -68,7 +58,6 @@ const ResultPage = () => {
     return Math.max(0, Math.min(100, s));
   }, [result]);
 
-  // ✅ Helper functions yang robust
   const safeText = (v) => {
     if (v === null || v === undefined) return '';
     return String(v);
@@ -78,13 +67,9 @@ const ResultPage = () => {
 
   const decodeHtml = (str) => {
     if (!str) return '';
-    try {
-      const txt = document.createElement('textarea');
-      txt.innerHTML = str;
-      return txt.value;
-    } catch {
-      return String(str);
-    }
+    const txt = document.createElement('textarea');
+    txt.innerHTML = str;
+    return txt.value;
   };
 
   const extractCorrectAnswer = (q) => {
@@ -112,12 +97,6 @@ const ResultPage = () => {
 
   const detailedAnswers = Array.isArray(result.detailedAnswers) ? result.detailedAnswers : [];
 
-  // ✅ PERBAIKAN: Validasi angka-angka result
-  const safeCorrect = Math.max(0, Number(result.correct) || 0);
-  const safeWrong = Math.max(0, Number(result.wrong) || 0);
-  const safeUnanswered = Math.max(0, Number(result.unanswered) || 0);
-  const safeTotal = Math.max(1, Number(result.total) || 1); // minimal 1 untuk hindari division by zero
-
   return (
     <PageBackground>
       <div className="min-h-screen w-full overflow-auto py-6 px-4">
@@ -134,8 +113,8 @@ const ResultPage = () => {
                 <div className="bg-earth-surface p-5 rounded-xl border border-secondary-light/50">
                   <div className="text-xs font-medium text-brown-lighter uppercase mb-2">Skor Anda</div>
                   <div className="flex items-end gap-2">
-                    <div className="text-3xl font-bold text-brown">{safeCorrect}</div>
-                    <div className="text-brown-light font-semibold">/{safeTotal}</div>
+                    <div className="text-3xl font-bold text-brown">{result.correct}</div>
+                    <div className="text-brown-light font-semibold">/{result.total}</div>
                   </div>
                   <div className="text-sm text-brown-light mt-1">soal terjawab benar</div>
                 </div>
@@ -144,7 +123,7 @@ const ResultPage = () => {
                   <div className="text-xs font-medium text-brown-lighter uppercase mb-2">Persentase</div>
                   <div className="text-3xl font-bold text-brown mb-3">{scorePct}%</div>
                   <div className="w-full h-2 rounded-full bg-white border border-secondary-light overflow-hidden">
-                    <div className="h-full bg-primary transition-all duration-300" style={{ width: `${scorePct}%` }} />
+                    <div className="h-full bg-primary" style={{ width: `${scorePct}%` }} />
                   </div>
                 </div>
 
@@ -160,15 +139,15 @@ const ResultPage = () => {
               <div className="grid grid-cols-3 gap-3 mb-6">
                 <div className="bg-white p-4 rounded-xl border border-secondary-light/50 text-center">
                   <div className="text-xs text-brown-lighter mb-1">Benar</div>
-                  <div className="text-xl font-bold text-accent">{safeCorrect}</div>
+                  <div className="text-xl font-bold text-accent">{result.correct}</div>
                 </div>
                 <div className="bg-white p-4 rounded-xl border border-secondary-light/50 text-center">
                   <div className="text-xs text-brown-lighter mb-1">Salah</div>
-                  <div className="text-xl font-bold text-sienna">{safeWrong}</div>
+                  <div className="text-xl font-bold text-sienna">{result.wrong}</div>
                 </div>
                 <div className="bg-white p-4 rounded-xl border border-secondary-light/50 text-center">
                   <div className="text-xs text-brown-lighter mb-1">Kosong</div>
-                  <div className="text-xl font-bold text-brown-lighter">{safeUnanswered}</div>
+                  <div className="text-xl font-bold text-brown-lighter">{result.unanswered}</div>
                 </div>
               </div>
 
@@ -194,65 +173,47 @@ const ResultPage = () => {
               <div className="p-6 md:p-8">
                 <h2 className="text-xl font-bold text-brown mb-6">Detail Jawaban</h2>
 
-                {detailedAnswers.length === 0 ? (
-                  <div className="text-center py-8 text-brown-light">
-                    <p>Tidak ada detail jawaban yang tersedia.</p>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {detailedAnswers.map((item, idx) => {
-                      const q = item?.question || {};
+                <div className="space-y-3">
+                  {detailedAnswers.map((item, idx) => {
+                    const q = item?.question || {};
 
-                      const userAnswer = normalize(safeText(item?.userAnswer));
-                      const correctAnswer = normalize(
-                        safeText(item?.correctAnswer) || extractCorrectAnswer(q)
-                      );
+                    const userAnswer = normalize(safeText(item?.userAnswer));
+                    const correctAnswer = normalize(
+                      safeText(item?.correctAnswer) || extractCorrectAnswer(q)
+                    );
 
-                      const isAnswered = Boolean(item?.isAnswered) && userAnswer !== '';
-                      const isCorrect = Boolean(item?.isCorrect);
+                    const isAnswered = Boolean(item?.isAnswered) && userAnswer !== '';
+                    const isCorrect = Boolean(item?.isCorrect);
 
-                      return (
-                        <div key={idx} className="bg-earth-surface rounded-xl border border-secondary-light/50 p-4">
-                          <div className="flex items-center justify-between mb-2">
-                            <div className="font-semibold text-brown">Soal {idx + 1}</div>
-                            {/* ✅ Status indicator */}
-                            <div className={`px-2 py-1 rounded-lg text-xs font-semibold ${
-                              !isAnswered 
-                                ? 'bg-gray-100 text-gray-600' 
-                                : isCorrect 
-                                  ? 'bg-green-100 text-green-700' 
-                                  : 'bg-red-100 text-red-700'
-                            }`}>
-                              {!isAnswered ? 'Tidak Dijawab' : isCorrect ? '✓ Benar' : '✗ Salah'}
-                            </div>
+                    return (
+                      <div key={idx} className="bg-earth-surface rounded-xl border border-secondary-light/50 p-4">
+                        <div className="font-semibold text-brown mb-2">Soal {idx + 1}</div>
+
+                        <div className="text-brown mb-3">{decodeHtml(q?.question)}</div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                          <div
+                            className={`rounded-xl border p-4 bg-white ${
+                              !isAnswered
+                                ? 'border-secondary-light/60'
+                                : isCorrect
+                                ? 'border-green-200'
+                                : 'border-red-200'
+                            }`}
+                          >
+                            <div className="font-semibold mb-1">Jawaban Kamu</div>
+                            <div>{isAnswered ? decodeHtml(userAnswer) : 'Tidak dijawab'}</div>
                           </div>
 
-                          <div className="text-brown mb-3">{decodeHtml(q?.question)}</div>
-
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-                            <div
-                              className={`rounded-xl border p-4 bg-white ${
-                                !isAnswered
-                                  ? 'border-secondary-light/60'
-                                  : isCorrect
-                                  ? 'border-green-200 bg-green-50/30'
-                                  : 'border-red-200 bg-red-50/30'
-                              }`}
-                            >
-                              <div className="font-semibold mb-1 text-brown-lighter">Jawaban Kamu</div>
-                              <div className="text-brown">{isAnswered ? decodeHtml(userAnswer) : 'Tidak dijawab'}</div>
-                            </div>
-
-                            <div className="rounded-xl border border-green-200 bg-green-50/30 p-4">
-                              <div className="font-semibold mb-1 text-brown-lighter">Jawaban Benar</div>
-                              <div className="text-brown">{correctAnswer ? decodeHtml(correctAnswer) : '-'}</div>
-                            </div>
+                          <div className="rounded-xl border border-secondary-light/60 p-4 bg-white">
+                            <div className="font-semibold mb-1">Jawaban Benar</div>
+                            <div>{correctAnswer ? decodeHtml(correctAnswer) : '-'}</div>
                           </div>
                         </div>
-                      );
-                    })}
-                  </div>
-                )}
+                      </div>
+                    );
+                  })}
+                </div>
 
               </div>
             </div>

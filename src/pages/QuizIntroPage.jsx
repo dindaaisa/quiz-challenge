@@ -43,18 +43,13 @@ const QuizIntroPage = () => {
     // simpan soal
     localStorage.setItem(`${username}:quiz-questions`, JSON.stringify(questions));
 
-    // ✅ PERBAIKAN: Simpan kategori yang konsisten
-    // Ambil dari quizInfo yang sudah diproses oleh quizService
-    const categoryToSave = quizInfo?.category || 'Mixed Categories';
-    
-    console.log('Saving quiz meta with category:', categoryToSave);
-
+    // âœ… simpan meta quiz supaya quiz page konsisten
     const meta = {
       total: questionAmount,
       timePerQuestion,
       totalTime,
-      category: categoryToSave,
-      difficulty: quizInfo?.difficulty || 'medium',
+      category: quizInfo?.category || questions?.[0]?.category || 'Mixed',
+      difficulty: quizInfo?.difficulty || questions?.[0]?.difficulty || 'medium',
       type: 'multiple'
     };
     localStorage.setItem(`${username}:quiz-meta`, JSON.stringify(meta));
@@ -68,9 +63,6 @@ const QuizIntroPage = () => {
   };
 
   if (loading) return <Loading text="Memuat soal..." />;
-
-  // ✅ Gunakan kategori dari quizInfo untuk konsistensi
-  const displayCategory = quizInfo?.category || 'Mixed Categories';
 
   return (
     <PageBackground>
@@ -133,7 +125,7 @@ const QuizIntroPage = () => {
                           Kategori
                         </div>
                         <div className="text-base font-bold text-brown leading-tight truncate">
-                          {displayCategory}
+                          {quizInfo?.category || 'Mixed'}
                         </div>
                       </div>
                     </div>

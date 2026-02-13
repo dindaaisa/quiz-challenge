@@ -8,7 +8,6 @@ export const useQuizProgress = (storageKey) => {
   const [timeRemaining, setTimeRemaining] = useState(null);
 
   const loadedOnceRef = useRef(false);
-  const isTransitioningRef = useRef(false); // ✅ Proteksi spam click
 
   // Load dari localStorage saat mount / storageKey berubah
   useEffect(() => {
@@ -24,10 +23,7 @@ export const useQuizProgress = (storageKey) => {
       const data = JSON.parse(saved);
       setCurrentQuestionIndex(Number(data.currentIndex ?? 0));
       setAnswers(data.answers ?? {});
-      
-      // ✅ PERBAIKAN: Validasi timeRemaining tidak boleh negatif
-      const savedTime = data.timeRemaining ?? null;
-      setTimeRemaining(savedTime !== null ? Math.max(0, savedTime) : null);
+      setTimeRemaining(data.timeRemaining ?? null);
 
       if (data.startTime) {
         const d = new Date(data.startTime);
@@ -40,7 +36,8 @@ export const useQuizProgress = (storageKey) => {
     }
   }, [storageKey]);
 
-  // Save ke localStorage setiap ada perubahan
+  // Save ke localStorage setiap ada perubahan.
+  // Disimpan walau startTime null, supaya jawaban tetap aman.
   useEffect(() => {
     if (!storageKey) return;
     if (!loadedOnceRef.current) return;
@@ -49,8 +46,7 @@ export const useQuizProgress = (storageKey) => {
       const data = {
         currentIndex: currentQuestionIndex,
         answers,
-        // ✅ Pastikan timeRemaining tidak negatif saat disimpan
-        timeRemaining: timeRemaining !== null ? Math.max(0, timeRemaining) : null,
+        timeRemaining,
         startTime: startTime ? startTime.toISOString() : null
       };
       localStorage.setItem(storageKey, JSON.stringify(data));
@@ -67,53 +63,20 @@ export const useQuizProgress = (storageKey) => {
   }, []);
 
   const nextQuestion = useCallback((totalQuestions) => {
-    // ✅ PERBAIKAN: Proteksi spam click
-    if (isTransitioningRef.current) return;
-    isTransitioningRef.current = true;
-
     setCurrentQuestionIndex((prev) => {
       const maxIdx = Math.max(0, (totalQuestions || 1) - 1);
-      const next = Math.min(prev + 1, maxIdx);
-      
-      // Reset flag setelah transisi
-      setTimeout(() => {
-        isTransitioningRef.current = false;
-      }, 100);
-      
-      return next;
+      return Math.min(prev + 1, maxIdx);
     });
   }, []);
 
   const previousQuestion = useCallback(() => {
-    // ✅ PERBAIKAN: Proteksi spam click
-    if (isTransitioningRef.current) return;
-    isTransitioningRef.current = true;
-
-    setCurrentQuestionIndex((prev) => {
-      const next = Math.max(prev - 1, 0);
-      
-      // Reset flag setelah transisi
-      setTimeout(() => {
-        isTransitioningRef.current = false;
-      }, 100);
-      
-      return next;
-    });
+    setCurrentQuestionIndex((prev) => Math.max(prev - 1, 0));
   }, []);
 
   const jumpToQuestion = useCallback((index, totalQuestions) => {
-    // ✅ PERBAIKAN: Proteksi spam click
-    if (isTransitioningRef.current) return;
-    isTransitioningRef.current = true;
-
     const maxIdx = Math.max(0, (totalQuestions || 1) - 1);
     const safeIdx = Math.min(Math.max(0, Number(index) || 0), maxIdx);
     setCurrentQuestionIndex(safeIdx);
-
-    // Reset flag setelah transisi
-    setTimeout(() => {
-      isTransitioningRef.current = false;
-    }, 100);
   }, []);
 
   const resetQuiz = useCallback(() => {
@@ -121,14 +84,12 @@ export const useQuizProgress = (storageKey) => {
     setAnswers({});
     setStartTime(null);
     setTimeRemaining(null);
-    isTransitioningRef.current = false; // ✅ Reset flag
     if (storageKey) localStorage.removeItem(storageKey);
   }, [storageKey]);
 
   const initializeQuiz = useCallback((totalTime) => {
     setStartTime(new Date());
-    // ✅ Validasi totalTime positif
-    setTimeRemaining(Math.max(0, totalTime));
+    setTimeRemaining(totalTime);
   }, []);
 
   return {

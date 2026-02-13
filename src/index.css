@@ -1,0 +1,88 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  #root {
+    width: 100%;
+    min-height: 100vh;
+  }
+}
+
+@layer components {
+  .btn {
+    @apply px-6 py-3 rounded-xl font-semibold transition-all duration-300;
+    @apply disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply inline-flex items-center justify-center gap-2;
+  }
+
+  .btn-primary {
+    @apply bg-primary text-white;
+    @apply hover:bg-primary-dark hover:shadow-earth-md hover:-translate-y-0.5;
+    @apply active:translate-y-0;
+  }
+
+  .btn-secondary {
+    @apply bg-white text-brown border-2 border-secondary-light;
+    @apply hover:border-primary hover:bg-earth-surface;
+  }
+
+  .btn-success {
+    @apply bg-accent text-white;
+    @apply hover:bg-accent-dark hover:shadow-earth-md hover:-translate-y-0.5;
+  }
+
+  .btn-danger {
+    @apply bg-sienna text-white;
+    @apply hover:bg-[#6D4C41] hover:shadow-earth-md hover:-translate-y-0.5;
+  }
+
+  .input-field {
+    @apply w-full px-4 py-3.5 border-2 border-secondary-light rounded-xl;
+    @apply bg-white text-brown placeholder:text-brown-lighter;
+    @apply focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/10;
+    @apply disabled:opacity-60 disabled:cursor-not-allowed;
+    @apply transition-all;
+  }
+
+  .input-field-error {
+    @apply border-sienna focus:border-sienna focus:ring-sienna/10;
+  }
+
+  .card {
+    @apply bg-white rounded-2xl shadow-earth-md;
+    @apply border border-secondary-light/20;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}

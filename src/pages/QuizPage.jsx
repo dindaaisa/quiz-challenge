@@ -35,6 +35,7 @@ const QuizPage = () => {
     resetQuiz
   } = useQuizProgress(storageKey);
 
+  // ✅ LOAD QUESTIONS & INITIALIZE TIMER
   useEffect(() => {
     if (!username) {
       navigate('/login');
@@ -52,23 +53,79 @@ const QuizPage = () => {
 
     // ✅ ambil meta
     const metaStr = localStorage.getItem(`${username}:quiz-meta`);
+    let meta = null;
     if (metaStr) {
       try {
-        setQuizMeta(JSON.parse(metaStr));
+        meta = JSON.parse(metaStr);
+        setQuizMeta(meta);
       } catch {
         setQuizMeta(null);
       }
     }
 
-    const savedProgress = localStorage.getItem(storageKey);
-    if (!savedProgress) {
-      // ✅ kalau meta ada, pakai totalTime dari meta biar sama kayak intro
-      const totalTime = metaStr ? (JSON.parse(metaStr)?.totalTime ?? 300) : 300;
+    // ✅ Tentukan totalTime
+    const totalTime = meta?.totalTime ?? 300;
+
+    // ✅ Cek saved progress
+    const savedProgressStr = localStorage.getItem(storageKey);
+    
+    let shouldInitialize = false;
+    
+    if (savedProgressStr) {
+      try {
+        const savedProgress = JSON.parse(savedProgressStr);
+        
+        // ✅ Validasi timeRemaining di saved progress
+        if (typeof savedProgress.timeRemaining !== 'number' || savedProgress.timeRemaining < 0) {
+          console.warn('⚠️ Saved progress has invalid timeRemaining, re-initializing...');
+          shouldInitialize = true;
+          
+          // Hapus saved progress yang corrupt
+          localStorage.removeItem(storageKey);
+        }
+      } catch (e) {
+        console.error('❌ Error parsing saved progress:', e);
+        shouldInitialize = true;
+        localStorage.removeItem(storageKey);
+      }
+    } else {
+      // Tidak ada saved progress
+      shouldInitialize = true;
+    }
+
+    // ✅ Initialize quiz kalau perlu
+    if (shouldInitialize) {
+      console.log('🎯 Initializing quiz with time:', totalTime);
       initializeQuiz(totalTime);
+    } else {
+      console.log('📂 Loaded valid saved progress');
     }
 
     setIsLoading(false);
   }, [username, navigate, storageKey, initializeQuiz]);
+
+  // ✅ FORCE TIMER (Safety net)
+  useEffect(() => {
+    if (timeRemaining === null || timeRemaining === undefined) {
+      const timeout = setTimeout(() => {
+        if (timeRemaining === null || timeRemaining === undefined) {
+          console.warn('⚠️⚠️ Force initializing timer!');
+          const totalTime = quizMeta?.totalTime ?? 300;
+          setTimeRemaining(totalTime);
+        }
+      }, 1000);
+      
+      return () => clearTimeout(timeout);
+    }
+  }, [timeRemaining, quizMeta, setTimeRemaining]);
+
+  // Debug log untuk timer
+  console.log('⏱️ QuizPage Timer State:', {
+    timeRemaining,
+    type: typeof timeRemaining,
+    isNull: timeRemaining === null,
+    isUndefined: timeRemaining === undefined
+  });
 
   const totalQuestions = questions.length;
 
@@ -190,8 +247,8 @@ const QuizPage = () => {
     );
   }
 
-  // ✅ UBAH: Kategori jadi "Campur"
-  const fixedCategoryLabel = 'Campur';
+  // ✅ KATEGORI: "Mixed" (hardcoded)
+  const fixedCategoryLabel = 'Mixed';
 
   return (
     <PageBackground>
@@ -258,17 +315,23 @@ const QuizPage = () => {
                       </div>
                     </div>
 
-                    {/* ✅ UBAH: Timer Section */}
+                    {/* ✅ TIMER SECTION */}
                     <div className="flex items-center gap-3 flex-shrink-0">
-                      <div className="text-white/90 text-xs font-semibold">Sisa Waktu</div>
-                      {timeRemaining !== null && (
-                        <div className="bg-white/20 rounded-xl px-3 py-1.5 min-w-[90px] text-center">
+                      <div className="text-white/90 text-xs font-semibold whitespace-nowrap">
+                        Sisa Waktu
+                      </div>
+                      {timeRemaining !== null && timeRemaining !== undefined ? (
+                        <div className="bg-white/20 backdrop-blur-sm rounded-xl px-4 py-2 min-w-[100px] flex items-center justify-center border border-white/10">
                           <QuizTimer
                             timeRemaining={timeRemaining}
                             setTimeRemaining={setTimeRemaining}
                             onTimeUp={handleTimeUp}
-                            className="text-white font-bold text-lg"
+                            className="text-white text-lg"
                           />
+                        </div>
+                      ) : (
+                        <div className="bg-white/20 backdrop-blur-sm rounded-xl px-4 py-2 min-w-[100px] text-center">
+                          <span className="text-white text-lg font-mono font-bold">--:--</span>
                         </div>
                       )}
                     </div>
@@ -281,7 +344,10 @@ const QuizPage = () => {
                     </div>
 
                     <div className="w-full h-2 rounded-full bg-white/20 overflow-hidden">
-                      <div className="h-full bg-white transition-all duration-300" style={{ width: `${progressPct}%` }} />
+                      <div 
+                        className="h-full bg-white transition-all duration-300" 
+                        style={{ width: `${progressPct}%` }} 
+                      />
                     </div>
                   </div>
                 </div>
@@ -307,6 +373,9 @@ const QuizPage = () => {
                     variant="secondary"
                     className="w-full sm:w-auto"
                   >
+                    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <polyline points="15 18 9 12 15 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
                     Kembali
                   </Button>
 
@@ -315,10 +384,16 @@ const QuizPage = () => {
                   {isLastQuestion ? (
                     <Button onClick={handleSubmit} variant="success" className="w-full sm:w-auto">
                       Selesai
+                      <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <polyline points="20 6 9 17 4 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
                     </Button>
                   ) : (
                     <Button onClick={handleNext} variant="primary" className="w-full sm:w-auto">
                       Lanjut
+                      <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <polyline points="9 18 15 12 9 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
                     </Button>
                   )}
                 </div>

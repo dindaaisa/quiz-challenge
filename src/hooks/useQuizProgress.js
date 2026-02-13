@@ -23,7 +23,14 @@ export const useQuizProgress = (storageKey) => {
       const data = JSON.parse(saved);
       setCurrentQuestionIndex(Number(data.currentIndex ?? 0));
       setAnswers(data.answers ?? {});
-      setTimeRemaining(data.timeRemaining ?? null);
+      
+      // ✅ FIX TIMER: Validasi timeRemaining adalah number dan >= 0
+      const savedTime = data.timeRemaining;
+      if (typeof savedTime === 'number' && savedTime >= 0) {
+        setTimeRemaining(savedTime);
+      } else {
+        setTimeRemaining(null);
+      }
 
       if (data.startTime) {
         const d = new Date(data.startTime);
@@ -37,16 +44,20 @@ export const useQuizProgress = (storageKey) => {
   }, [storageKey]);
 
   // Save ke localStorage setiap ada perubahan.
-  // Disimpan walau startTime null, supaya jawaban tetap aman.
   useEffect(() => {
     if (!storageKey) return;
     if (!loadedOnceRef.current) return;
 
     try {
+      // ✅ FIX TIMER: Pastikan timeRemaining yang disave adalah number atau null
+      const validTimeRemaining = typeof timeRemaining === 'number' && timeRemaining >= 0 
+        ? timeRemaining 
+        : null;
+
       const data = {
         currentIndex: currentQuestionIndex,
         answers,
-        timeRemaining,
+        timeRemaining: validTimeRemaining,
         startTime: startTime ? startTime.toISOString() : null
       };
       localStorage.setItem(storageKey, JSON.stringify(data));
@@ -87,9 +98,16 @@ export const useQuizProgress = (storageKey) => {
     if (storageKey) localStorage.removeItem(storageKey);
   }, [storageKey]);
 
+  // ✅ FIX TIMER: Validasi totalTime adalah number
   const initializeQuiz = useCallback((totalTime) => {
+    console.log('🚀 initializeQuiz called with:', totalTime, typeof totalTime);
+    
+    const validTime = typeof totalTime === 'number' && totalTime > 0 ? totalTime : 300;
+    
     setStartTime(new Date());
-    setTimeRemaining(totalTime);
+    setTimeRemaining(validTime);
+    
+    console.log('✅ Timer initialized to:', validTime);
   }, []);
 
   return {
